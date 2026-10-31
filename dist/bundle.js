@@ -5,18 +5,18 @@
  */
 (function () {
   'use strict';
- 
+
   var PLUGIN_ID = 'school-menu';
   var API = 'https://menus.healthepro.com/api/organizations';
   var REFRESH_MS = 60 * 1000; // re-check the date every minute (cheap: responses are cached)
   var CACHE_MS = 30 * 60 * 1000; // upstream cache, max allowed is 1 hour
- 
+
   function sdk() {
     return window.__HS_SDK__;
   }
- 
+
   // ---------------------------------------------------------------- data layer
- 
+
   function getJson(url) {
     return sdk()
       .pluginFetch(PLUGIN_ID, { url: url, cacheTtlMs: CACHE_MS })
@@ -25,7 +25,7 @@
         return res.json();
       });
   }
- 
+
   // Responses wrap their payload in { data: ... }. Be tolerant of arrays of
   // arrays and of objects grouped by key (the org list is grouped by state).
   function asList(json) {
@@ -42,7 +42,7 @@
     }
     return [];
   }
- 
+
   function firstString(obj, keys) {
     for (var i = 0; i < keys.length; i++) {
       var v = obj && obj[keys[i]];
@@ -50,7 +50,7 @@
     }
     return '';
   }
- 
+
   // Best effort: the district name is not part of any endpoint I could confirm,
   // so accept a few plausible shapes and fall back to '' (the UI then shows nothing).
   function nameFromOrg(json) {
@@ -58,7 +58,7 @@
     if (Array.isArray(d)) d = d[0];
     return firstString(d, ['name', 'organization_name', 'title', 'display_name']);
   }
- 
+
   function nameFromSites(sites) {
     for (var i = 0; i < sites.length; i++) {
       var s = sites[i] || {};
@@ -70,7 +70,7 @@
     }
     return '';
   }
- 
+
   function getOrgName(org) {
     return getJson(API + '/' + encodeURIComponent(org))
       .then(nameFromOrg)
@@ -78,17 +78,17 @@
         return '';
       });
   }
- 
+
   function listSites(org) {
     return getJson(API + '/' + encodeURIComponent(org) + '/sites/list').then(asList);
   }
- 
+
   function listMenus(org, site) {
     return getJson(
       API + '/' + encodeURIComponent(org) + '/sites/' + encodeURIComponent(site) + '/menus/'
     ).then(asList);
   }
- 
+
   function fetchMonth(org, menuId, year, month) {
     return getJson(
       API +
@@ -97,9 +97,9 @@
         '/year/' + year + '/month/' + month + '/date_overwrites'
     ).then(asList);
   }
- 
+
   // ------------------------------------------------------------------- parsing
- 
+
   // One date_overwrites entry -> { day, dayOff, groups: [{ name, items[] }] }
   function parseDay(entry) {
     var setting = entry && entry.setting;
@@ -111,14 +111,14 @@
       }
     }
     setting = setting || {};
- 
+
     var off = setting.days_off || {};
     var dayOff = off.status ? off.description || 'No school' : null;
- 
+
     var rows = (setting.current_display || []).slice().sort(function (a, b) {
       return (a.weight || 0) - (b.weight || 0);
     });
- 
+
     var groups = [];
     var byName = {};
     var current = null;
@@ -141,7 +141,7 @@
         if (current.items.indexOf(row.name) === -1) current.items.push(row.name);
       }
     });
- 
+
     return {
       day: String(entry.day).slice(0, 10),
       dayOff: dayOff,
@@ -150,14 +150,14 @@
       }),
     };
   }
- 
+
   function pickDay(entries, iso) {
     for (var i = 0; i < entries.length; i++) {
       if (String(entries[i].day).slice(0, 10) === iso) return entries[i];
     }
     return null;
   }
- 
+
   // "YYYY-MM-DD" plus n days, done in UTC so DST and device timezone can't skew it.
   function addDays(iso, n) {
     var p = iso.split('-');
@@ -167,9 +167,9 @@
     };
     return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate());
   }
- 
+
   var LOOKAHEAD_DAYS = 14;
- 
+
   // Decide which day to show. Before `advanceHour` (or when it is 0/off) that is
   // today. After it, the next day that actually has a menu, looking up to two
   // weeks ahead so weekends, holidays and breaks are skipped.
@@ -190,7 +190,7 @@
     }
     return { iso: iso, isNext: false, isTomorrow: false, day: null };
   }
- 
+
   function wall() {
     try {
       var w = sdk().wallClock();
@@ -207,14 +207,14 @@
       minuteOfDay: d.getHours() * 60 + d.getMinutes(),
     };
   }
- 
+
   // Base text size in px (everything inside scales from this via em units).
   function fontSizePx(config) {
     var n = Number(config && config.fontSize);
     if (!isFinite(n) || n <= 0) return 16;
     return Math.max(8, Math.min(96, Math.round(n)));
   }
- 
+
   function parseHidden(text) {
     return String(text || '')
       .split(',')
@@ -223,14 +223,14 @@
       })
       .filter(Boolean);
   }
- 
+
   function visibleGroups(groups, hideText) {
     var hidden = parseHidden(hideText);
     return groups.filter(function (g) {
       return hidden.indexOf(g.name.trim().toLowerCase()) === -1;
     });
   }
- 
+
   function prettyDate(iso) {
     try {
       var parts = iso.split('-');
@@ -240,19 +240,19 @@
       return iso;
     }
   }
- 
+
   // -------------------------------------------------------------------- render
- 
+
   function dateLine(state) {
     var label = state.isNext ? (state.isTomorrow ? 'Tomorrow' : 'Next school day') : '';
     return (label ? label + ' \u00b7 ' : '') + prettyDate(state.iso);
   }
- 
+
   // Pure: builds the element tree with whatever `h` it is given (so it can be
   // unit-tested without React).
   function renderBody(h, state, config) {
     var small = { fontSize: '0.8em', opacity: 0.7 };
- 
+
     if (state.unconfigured) {
       return h('div', { style: { opacity: 0.8 } }, 'Choose a school and menu in this module\u2019s settings.');
     }
@@ -268,7 +268,7 @@
         reason ? h('div', { style: small }, reason) : null
       );
     }
- 
+
     var groups = visibleGroups(state.day.groups, config.hideCategories);
     return h(
       'div',
@@ -291,18 +291,18 @@
       })
     );
   }
- 
+
   function SchoolMenu(props) {
     var React = window.React;
     var h = React.createElement;
     var config = props.config || {};
     var org = String(config.organizationId || '').trim();
     var menuId = String(config.menuId || '').trim();
- 
+
     var _s = React.useState({ loading: true });
     var state = _s[0];
     var setState = _s[1];
- 
+
     React.useEffect(
       function () {
         if (!org || !menuId) {
@@ -321,7 +321,7 @@
           var later = monthOf(addDays(iso, LOOKAHEAD_DAYS));
           var wantsNext = Number(advanceHour) > 0 && w.minuteOfDay >= Number(advanceHour) * 60;
           var needsLater = wantsNext && (later.y !== cur.y || later.m !== cur.m);
- 
+
           var main = fetchMonth(org, menuId, cur.y, cur.m);
           // The following month may not be published yet; that is not an error.
           var extra = needsLater
@@ -329,7 +329,7 @@
                 return [];
               })
             : Promise.resolve([]);
- 
+
           Promise.all([main, extra])
             .then(function (res) {
               if (!alive) return;
@@ -357,7 +357,7 @@
       },
       [org, menuId, config.advanceAfterHour]
     );
- 
+
     var ready = !state.loading && !state.error;
     var content = ready
       ? h(
@@ -370,16 +370,16 @@
           renderBody(h, state, config)
         )
       : null;
- 
+
     var S = sdk();
     if (S && S.ModuleLoadingState) {
       return h(S.ModuleLoadingState, { loading: !!state.loading, error: state.error }, content);
     }
     return content || h('div', { style: { padding: 16 } }, state.error || 'Loading\u2026');
   }
- 
+
   // ------------------------------------------------------------- config panel
- 
+
   function ConfigSection(props) {
     var React = window.React;
     var h = React.createElement;
@@ -388,10 +388,10 @@
     var onChange = props.onChange;
     var INPUT = S.INPUT_CLASS;
     var LABEL = 'block text-xs text-neutral-400 mb-1 mt-3';
- 
+
     var org = String(config.organizationId || '').trim();
     var site = String(config.siteId || '').trim();
- 
+
     var _d = React.useState(org);
     var orgDraft = _d[0];
     var setOrgDraft = _d[1];
@@ -407,7 +407,7 @@
     var _err = React.useState('');
     var err = _err[0];
     var setErr = _err[1];
- 
+
     React.useEffect(
       function () {
         if (!org) {
@@ -432,7 +432,7 @@
       },
       [org]
     );
- 
+
     // District name: from the org endpoint if it has one, else from the site list.
     React.useEffect(
       function () {
@@ -450,7 +450,7 @@
       },
       [org, sites]
     );
- 
+
     React.useEffect(
       function () {
         if (!org || !site) {
@@ -474,16 +474,16 @@
       },
       [org, site]
     );
- 
+
     function commitOrg() {
       var v = orgDraft.trim();
       if (v !== org) onChange({ organizationId: v, siteId: '', menuId: '' });
     }
- 
+
     function label(item) {
       return item.name || item.title || item.site_name || String(item.id);
     }
- 
+
     var body = h(
       'div',
       null,
@@ -502,7 +502,7 @@
       }),
       orgName ? h('div', { className: 'text-xs text-emerald-400 mt-1' }, orgName) : null,
       h('div', { className: 'text-xs text-neutral-500 mt-1' }, 'The number in menus.healthepro.com/organizations/<id>'),
- 
+
       h('label', { className: LABEL }, 'School'),
       h(
         'select',
@@ -518,7 +518,7 @@
           return h('option', { key: s.id, value: String(s.id) }, label(s));
         })
       ),
- 
+
       h('label', { className: LABEL }, 'Menu'),
       h(
         'select',
@@ -535,9 +535,9 @@
           return h('option', { key: m.id, value: String(m.id) }, label(m));
         })
       ),
- 
+
       err ? h('div', { className: 'text-xs text-red-400 mt-2' }, err) : null,
- 
+
       h('label', { className: LABEL }, 'Title'),
       h('input', {
         className: INPUT,
@@ -546,7 +546,7 @@
           onChange({ title: e.target.value });
         },
       }),
- 
+
       h('label', { className: LABEL }, 'Text size (' + fontSizePx(config) + ' px)'),
       h('input', {
         className: INPUT,
@@ -559,7 +559,7 @@
           onChange({ fontSize: parseInt(e.target.value, 10) });
         },
       }),
- 
+
       h('label', { className: LABEL }, 'Hide categories (comma separated)'),
       h('input', {
         className: INPUT,
@@ -569,7 +569,7 @@
           onChange({ hideCategories: e.target.value });
         },
       }),
- 
+
       h('label', { className: LABEL }, 'Show the next school day after this hour (0 = off)'),
       h('input', {
         className: INPUT,
@@ -584,7 +584,7 @@
         },
       }),
       h('div', { className: 'text-xs text-neutral-500 mt-1' }, 'e.g. 14 switches to tomorrow\u2019s menu at 2 PM, skipping weekends and holidays'),
- 
+
       h('label', { className: LABEL }, 'Text when there is no meal'),
       h('input', {
         className: INPUT,
@@ -594,11 +594,11 @@
         },
       })
     );
- 
+
     // AccordionSection only exists in the editor; ConfigSection only renders there.
     return S.AccordionSection ? h(S.AccordionSection, { title: 'School Menu' }, body) : body;
   }
- 
+
   window.__HS_PLUGIN__ = {
     default: SchoolMenu,
     ConfigSection: ConfigSection,
@@ -606,4 +606,3 @@
     _internals: { parseDay: parseDay, pickDay: pickDay, visibleGroups: visibleGroups, renderBody: renderBody, asList: asList, nameFromOrg: nameFromOrg, nameFromSites: nameFromSites, getOrgName: getOrgName, fontSizePx: fontSizePx, resolveDay: resolveDay, addDays: addDays, dateLine: dateLine, fetchMonth: fetchMonth, listMenus: listMenus, listSites: listSites },
   };
 })();
- 
