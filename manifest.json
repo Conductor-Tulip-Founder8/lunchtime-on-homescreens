@@ -1,0 +1,42 @@
+{
+  "id": "school-menu",
+  "name": "School Menu",
+  "version": "0.2.0",
+  "description": "Shows today's school breakfast or lunch menu from Health-e Pro (menus.healthepro.com).",
+  "author": "Conductor-Tulip-Founder8",
+  "license": "MIT",
+  "minAppVersion": "0.18.0",
+  "moduleType": "school-menu",
+  "category": "Personal",
+  "icon": "utensils",
+  "defaultConfig": {
+    "organizationId": "1031",
+    "siteId": "",
+    "menuId": "",
+    "title": "School Lunch",
+    "hideCategories": "Milk, Condiments",
+    "noSchoolText": "No school meals today",
+    "advanceAfterHour": 0
+  },
+  "defaultSize": {
+    "w": 420,
+    "h": 320
+  },
+  "permissions": [
+    "network"
+  ],
+  "allowedDomains": [
+    "menus.healthepro.com"
+  ],
+  "exports": {
+    "component": "default",
+    "configSection": "ConfigSection"
+  },
+  "configMigrations": {
+    "0.2.0": {
+      "defaults": {
+        "advanceAfterHour": 0
+      }
+    }
+  }
+}
