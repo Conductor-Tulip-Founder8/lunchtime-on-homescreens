@@ -1,6 +1,8 @@
 School Menu (Home Screens plugin)
 
 Shows today's school breakfast/lunch from Health-e Pro (menus.healthepro.com).
+
+
 Settings
 
 Show the next school day after this hour (0 = off, default): e.g. `14` switches to
